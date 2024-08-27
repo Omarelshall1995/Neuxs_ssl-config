@@ -1,0 +1,189 @@
+Nexus with SSL Configuration Using Nginx 
+
+Overview 
+
+This document outlines the steps taken to configure Nexus Repository Manager to use SSL via Nginx, ensuring secure access to Nexus. The configuration uses Docker to run Nexus and Nginx as a reverse proxy to handle SSL termination. 
+
+Steps to Configure Nexus with SSL Using Nginx 
+
+1. Remove Existing Nexus Data and Configuration 
+
+We started by removing any existing Nexus data, Docker containers, and configurations to ensure a clean setup. 
+
+  
+
+    Commands used: 
+
+    - Remove Nexus data directory: 
+
+      ``` 
+
+     w 
+
+      ``` 
+
+    - Stop and remove existing Nexus Docker container: 
+
+      ``` 
+
+      docker stop nexus_ssl 
+
+      docker rm nexus_ssl 
+
+      ``` 
+
+    - Remove Nexus-related directories under /opt/sonatype: 
+
+      ``` 
+
+      sudo rm -rf /opt/sonatype 
+
+      ``` 
+
+     
+
+2. Set Up Nginx with SSL 
+
+We installed Nginx, generated SSL certificates, and configured Nginx to act as a reverse proxy for Nexus. 
+
+ 
+
+    Commands used: 
+
+    - Install Nginx: 
+
+      ``` 
+
+      sudo apt-get update 
+
+      sudo apt-get install nginx 
+
+      ``` 
+
+    - Generate self-signed SSL certificates: 
+
+      ``` 
+
+      sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/nexus.key -out /etc/ssl/certs/nexus.crt 
+
+      ``` 
+
+    Head over to >  sudo nano /etc/nginx/sites-available/nexus 
+
+ 
+
+Configuration for Nginx to listen on custom ports (8443 for HTTPS, 8081 for HTTP): 
+
+  
+
+    ```nginx 
+
+    server { 
+
+        listen 8443 ssl; 
+
+        server_name localhost; 
+
+  
+
+        ssl_certificate /etc/ssl/certs/nexus.crt; 
+
+        ssl_certificate_key /etc/ssl/private/nexus.key; 
+
+  
+
+        location / { 
+
+            proxy_pass http://localhost:8082/; 
+
+            proxy_set_header Host $host; 
+
+            proxy_set_header X-Real-IP $remote_addr; 
+
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; 
+
+            proxy_set_header X-Forwarded-Proto $scheme; 
+
+        } 
+
+    } 
+
+  
+
+    server { 
+
+        listen 8081; 
+
+        server_name localhost; 
+
+  
+
+        location / { 
+
+            return 301 https://$host$request_uri; 
+
+        } 
+
+    } 
+
+    ``` 
+
+     
+
+ 
+
+Disable Default Configuration >    sudo rm /etc/nginx/sites-enabled/default 
+
+Create a SYM-LINK >         sudo ln -s /etc/nginx/sites-available/nexus.conf /etc/nginx/sites-enabled/ 
+
+ 
+
+     
+
+4. Start and Configure Nexus Docker Container 
+
+After configuring Nginx, we started a new Nexus Docker container on a different port. 
+
+  
+
+    Command used: 
+
+    - Start Nexus Docker container: 
+
+      ``` 
+
+      docker run -d -p 8082:8081 --name nexus sonatype/nexus3 
+
+      ``` 
+
+Start the container: sudo docker start <container_name>  
+
+     
+
+5. Verify the Setup 
+
+Finally, we verified that Nginx and Nexus were running correctly and accessible via HTTPS. 
+
+  
+
+    Commands used: 
+
+    - Check the status of Nginx: 
+
+      ``` 
+
+       Sudo systemctl reload nginx 
+
+      sudo systemctl status nginx              
+
+       sudo nginx –t              < If ur getting syntax is Ok ur good 2 go  
+
+      ``` 
+
+    - Access Nexus via HTTPS: 
+
+      - `https://<your-ip-address>:8443` 
+
+     
+
+ 
